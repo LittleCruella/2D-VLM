@@ -94,19 +94,19 @@ class CLIPDataset(Dataset):
                 image = np.expand_dims(image, axis=0)
                 image = self.transform(image)
 
-                text_path = data["text"]
-                text_abs_path = os.path.join(self.data_root, text_path)
-                with open(text_abs_path, 'r') as text_file:
-                    raw_text = text_file.read()
-                text = self.truncate_text(raw_text, self.args.max_length)
-
+                # text_path = data["text"]
+                # text_abs_path = os.path.join(self.data_root, text_path)
+                # with open(text_abs_path, 'r') as text_file:
+                #     raw_text = text_file.read()
+                # text = self.truncate_text(raw_text, self.args.max_length)
+                text = data["text"][:self.args.max_length]  # Truncate text to max_length
                 text_tensor = self.tokenizer(
                     text, max_length=self.args.max_length, truncation=True, padding="max_length", return_tensors="pt"
                 )
 
                 input_id = text_tensor["input_ids"][0]
                 attention_mask = text_tensor["attention_mask"][0]
-
+                print(image.shape, input_id.shape, attention_mask.shape)
                 ret = {
                     'image': image,
                     'text': text,

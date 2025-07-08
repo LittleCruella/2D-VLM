@@ -1,0 +1,7 @@
+typing-extensions
+einops
+transformers
+pandas
+scikit-learn 
+monai
+SimpleITK
