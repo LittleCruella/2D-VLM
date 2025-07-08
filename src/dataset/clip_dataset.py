@@ -123,7 +123,8 @@ class CLIPDataset(Dataset):
 
                 image = sitk.ReadImage(image_abs_path)
                 image = sitk.GetArrayFromImage(image) # np.ndarray (D, H, W) hoặc (H, W)
-
+                image = np.transpose(image, (2, 0, 1)) # (H, W, C) -> (C, H, W)
+                print(f"DEBUG: Loaded image from {image_abs_path} with shape {image.shape}")
                 # Xử lý ảnh 3D thành 2D nếu cần (nếu dữ liệu là 3D)
                 if image.ndim == 3: # Nếu ảnh là 3D (D, H, W)
                     # Chọn một slice ở giữa D chiều hoặc ngẫu nhiên
