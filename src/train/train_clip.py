@@ -80,7 +80,7 @@ class DataArguments:
         metadata={"help": "Path to caption data."},
     )
     max_length: int = field(default=512)
-
+    input_image: tuple = field(default=(256, 256, 128))
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
