@@ -36,7 +36,7 @@ def rank0_print(*args):
 class ModelArguments:
     wb_name: Optional[str] = field(default="CLIP")
     language_model_name_or_path: str = field(
-        default="medicalai/ClinicalBERT"
+        default="google-bert/bert-base-uncased"
     )
 
     efficient_loss: bool = field(
@@ -58,8 +58,8 @@ class ModelArguments:
 
     pretrained_model: str = field(default=None)
 
-    input_size: tuple = field(default=(256, 256, 128))
-    dim: int = field(default=768)
+    input_size: tuple = field(default=(256, 256))
+    dim: int = field(default=512)
     depth: int = field(default=12)
     hidden_size: int = field(default=768)
     mlp_depth: int = field(default=2)
@@ -80,7 +80,7 @@ class DataArguments:
         metadata={"help": "Path to caption data."},
     )
     max_length: int = field(default=512)
-    input_image: tuple = field(default=(256, 256, 128))
+    input_image: tuple = field(default=(256, 256))
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):

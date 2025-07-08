@@ -31,8 +31,8 @@ class DEC_CLIPConfig(PretrainedConfig):
         language_model_name_or_path: str = "",
         local_loss: bool = False,
         gather_loss: bool = True,
-        input_size: tuple = (256, 256, 128),
-        dim: int = 768,
+        input_size: tuple = (256, 256),
+        dim: int = 512,
         depth: int = 12,
         hidden_size: int = 512,
         mlp_depth: int = 2,
@@ -87,10 +87,12 @@ class DEC_CLIP(PreTrainedModel):
             512, config.hidden_size
         )
 
+        # self.mm_language_proj = nn.Linear(
+        #     self.language_encoder.config.dim, config.hidden_size
+        # )
         self.mm_language_proj = nn.Linear(
-            self.language_encoder.config.dim, config.hidden_size
+            768, config.hidden_size
         )
-
         self.efficient_loss = config.efficient_loss
         self.local_loss = config.local_loss
         self.gather_loss = config.gather_loss
