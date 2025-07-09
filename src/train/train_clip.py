@@ -65,7 +65,7 @@ class ModelArguments:
     mlp_depth: int = field(default=2)
 
     vision_encoder: Optional[str] = field(default="vit2d")
-    loss_type: str = field(default="nce")
+    loss_type: str = field(default="sigmoid", metadata={"help": "Loss type for training."})
     siglip_margin: float = field(default=0.1)
 
 

@@ -83,12 +83,12 @@ class ViTEncoder(nn.Module):
     def __init__(
         self,
         image_size=[256, 256],  # Kích thước 2D
-        patch_size=16,
+        patch_size=2,
         dim=512,
         depth=8,
         heads=8,
         mlp_dim=4,
-        channels=3,  # Số kênh cho ảnh 2D (ví dụ: 3 cho RGB)
+        channels=1,  # Số kênh cho ảnh 2D (ví dụ: 3 cho RGB)
         dim_head=64,
         dropout=0.0,
         emb_dropout=0.0,
@@ -103,10 +103,9 @@ class ViTEncoder(nn.Module):
         num_patches = (h // patch_size) * (w // patch_size) 
 
         patch_dim = channels * patch_size * patch_size
-
         self.to_patch_embedding = nn.Sequential(
             Rearrange(
-                "b c (h p1) (w p2) -> b (h w) (p1 p2 c)", 
+                "b c (h p1) (w p2) -> b (h w) (c p1 p2)", 
                 p1=patch_size,
                 p2=patch_size,
             ),
@@ -139,7 +138,7 @@ class ViTEncoder(nn.Module):
             x=self.vit_img_dim[0],
             y=self.vit_img_dim[1],
         )
-
+        # print(f"Output shape after rearranging: {x.shape}")  # Debugging line
         return x
 
 # Class Vit2D đã được chỉnh sửa
@@ -153,13 +152,14 @@ class Vit2D(nn.Module):
         tokens = self.encoder(image)
         shape = tokens.shape
         *_, h, w = shape
-
+        # Đảm bảo tokens có kích thước (batch_size, channels, height, width)
         # Nếu bạn có sử dụng VectorQuantize, hãy bỏ comment phần này
         # tokens, _ = pack([tokens], "b * d")
         # vq_mask = None
         # tokens, _, _ = self.vq(tokens, mask = vq_mask)
         # tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h = h, w = w)
-
+        # print(f"Output shape of Vit2D: {tokens.shape}")  # Debugging line
+        tokens = rearrange(tokens, "b c h w -> b h w c")  # Đảm bảo tokens có dạng (batch_size, height, width, channels)
         return tokens
 
 

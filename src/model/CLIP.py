@@ -22,6 +22,7 @@ from src.model.encoder.vit import Vit2D
 # except ImportError:
 #     has_distributed = False
 
+has_distributed = False
 
 class DEC_CLIPConfig(PretrainedConfig):
     model_type = "dec_clip"
@@ -72,7 +73,7 @@ class DEC_CLIP(PreTrainedModel):
                 depth=config.depth,
             )
         # elif config.vision_encoder == "dcformer":
-        #     self.vision_encoder = decomp_small(input_size=config.input_size)
+        #    self.vision_encoder = decomp_small(input_size=config.input_size)
         else:
             raise ValueError(f"Unexpected vision encoder: {config.vision_encoder}")
 
@@ -80,22 +81,16 @@ class DEC_CLIP(PreTrainedModel):
             config.language_model_name_or_path
         )
 
-        # self.mm_vision_proj = nn.Linear(
-        #     self.vision_encoder.channels[-1], config.hidden_size
-        # )
         self.mm_vision_proj = nn.Linear(
-            512, config.hidden_size
+            512, config.hidden_size # Lưu ý: Đây là 512, không phải self.vision_encoder.channels[-1]
         )
 
-        # self.mm_language_proj = nn.Linear(
-        #     self.language_encoder.config.dim, config.hidden_size
-        # )
         self.mm_language_proj = nn.Linear(
-            768, config.hidden_size
+            768, config.hidden_size # Lưu ý: Đây là 768, không phải self.language_encoder.config.dim
         )
         self.efficient_loss = config.efficient_loss
         self.local_loss = config.local_loss
-        self.gather_loss = config.gather_loss
+        self.gather_loss = config.gather_loss # Sẽ bị bỏ qua nếu không có distributed
         self.loss_type = config.loss_type
 
         if self.loss_type == "sigmoid":
@@ -108,17 +103,23 @@ class DEC_CLIP(PreTrainedModel):
         image_feats = self.vision_encoder(image)
         if isinstance(image_feats, list):
             image_feats = image_feats[-1]
-        image_feats = image_feats.mean(dim=1)
+        # print("Shape trước mean:", image_feats.shape) # Ví dụ: [B, num_tokens, dim]
+        image_feats = image_feats.mean(dim=1) # Lấy average pooling trên các token/patch.
+        # print("Shape sau mean:", image_feats.shape) # Ví dụ: [B, dim]
+        # Sau Vit2D, dim = config.dim = 768. Do đó mm_vision_proj cần input là 768, không phải 512.
+        # self.mm_vision_proj = nn.Linear(self.vision_encoder.channels[-1], config.hidden_size)
+        # Nếu Vit2D trả về dim=768, thì mm_vision_proj nên là Linear(768, config.hidden_size)
         image_feats = self.mm_vision_proj(image_feats)
+        # print("Shape sau mm_vision_proj:", image_feats.shape)
         image_feats = F.normalize(image_feats, dim=-1)
-
+        # print("Shape sau normalize:", image_feats.shape)
         return image_feats
 
     def encode_text(self, input_id, attention_mask):
         text_feats = self.language_encoder(input_id, attention_mask=attention_mask)[
             "last_hidden_state"
         ]
-        text_feats = text_feats[:, 0]
+        text_feats = text_feats[:, 0] # Lấy CLS token của BERT
         text_feats = self.mm_language_proj(text_feats)
         text_feats = F.normalize(text_feats, dim=-1)
 
@@ -128,124 +129,62 @@ class DEC_CLIP(PreTrainedModel):
         image_features = self.encode_image(images)
         text_features = self.encode_text(input_ids, attention_mask)
 
-        rank = 0
-        world_size = 1
-        if has_distributed and dist.is_initialized():
-            rank = dist.get_rank()
-            world_size = dist.get_world_size()
+        # Removed distributed and dist related code
+        # rank = 0
+        # world_size = 1
 
         batch_size = image_features.size(0)
         device = image_features.device
+
         if self.loss_type == "sigmoid":
-            if has_distributed and dist.is_initialized():
-                if self.efficient_loss:
-                    t = torch.exp(self.t_prime)
-                    loss = 0.0
+            # Không có has_distributed, nên chỉ chạy phần else
+            t = torch.exp(self.t_prime)
 
-                    for target_rank in range(world_size):
-                        if rank == target_rank:
-                            target_text_features = text_features
-                        else:
-                            target_text_features = torch.distributed.nn.broadcast(
-                                text_features.requires_grad_(), target_rank
-                            )
+            # gather_features sẽ không còn được sử dụng
+            # all_image_features, all_text_features = gather_features(...)
+            # Giờ đây, all_image_features = image_features và all_text_features = text_features
+            
+            # Tính logits
+            logits_per_image = (
+                image_features @ text_features.T
+            ) * t + self.bias
+            logits_per_text = logits_per_image.T
+            
+            # batch_size ở đây là batch_size của local
+            labels_tensor = 2 * torch.eye(
+                batch_size, device=image_features.device
+            ) - torch.ones(batch_size, batch_size, device=image_features.device)
 
-                        local_logits_per_image = (
-                            image_features @ target_text_features.T
-                        ) * t + self.bias
-                        local_logits_per_text = local_logits_per_image.T
+            logits = (logits_per_image + logits_per_text) / 2.0
+            logits = logits.mean(dim=1)  
+            print("logits.shape:", logits.shape)
+            print("labels_tensor.shape:", labels_tensor.shape)
+            loss = -torch.sum(F.logsigmoid(labels_tensor * logits)) / batch_size # Chia cho batch_size nếu muốn mean loss
 
-                        if rank == target_rank:
-                            local_labels = 2 * torch.eye(
-                                batch_size, device=device
-                            ) - torch.ones(batch_size, batch_size, device=device)
-                        else:
-                            local_labels = -torch.ones(
-                                batch_size, batch_size, device=device
-                            )
+        else: # self.loss_type != "sigmoid" (e.g., "cross_entropy" as in CLIP)
+            # gather_features sẽ không còn được sử dụng
+            # all_image_features, all_text_features = gather_features(...)
+            # Giờ đây, all_image_features = image_features và all_text_features = text_features
 
-                        local_logits = (
-                            local_logits_per_image + local_logits_per_text
-                        ) / 2.0
-                        local_loss = -torch.sum(
-                            F.logsigmoid(local_labels * local_logits)
-                        ) / (batch_size * world_size)
+            # gather_loss, local_loss không còn tác dụng khi không có distributed
+            # nên sẽ chỉ thực hiện phép nhân ma trận cục bộ
+            
+            logits_per_image = self.logit_scale * image_features @ text_features.T
+            # print("logits_per_image.shape:", logits_per_image.shape)
+            # print("text_features.shape (transposed for dot product):", text_features.T.shape)
+            # print("image_features.shape:", image_features.shape)
+            
+            logits_per_text = self.logit_scale * text_features @ image_features.T
 
-                        loss += local_loss
+            # Labels cho Cross Entropy Loss (thường là one-hot hoặc chỉ số)
+            # Trong CLIP, labels là ma trận đồng nhất (identity matrix)
+            labels_ce = torch.arange(batch_size, device=device) # [0, 1, ..., batch_size-1]
 
-                    torch.distributed.nn.all_reduce(loss)
-                    torch.cuda.synchronize()
-
-                    if self.training:
-                        logits = 0
-                else:
-                    t = torch.exp(self.t_prime)
-
-                    all_image_features, all_text_features = gather_features(
-                        image_features,
-                        text_features,
-                        gather_with_grad=True,
-                        rank=rank,
-                        world_size=world_size,
-                    )
-
-                    logits_per_image = (
-                        all_image_features @ all_text_features.T
-                    ) * t + self.bias
-                    logits_per_text = logits_per_image.T
-                    batch_size = all_image_features.size(0)
-
-                    labels = 2 * torch.eye(
-                        batch_size, device=image_features.device
-                    ) - torch.ones(batch_size, device=image_features.device)
-
-                    logits = (logits_per_image + logits_per_text) / 2.0
-                    loss = -torch.sum(F.logsigmoid(labels * logits)) / batch_size
-
-            else:
-                logits_per_image = (
-                    image_features @ text_features.T
-                ) * self.t_prime + self.bias
-                logits_per_text = logits_per_image.T
-
-                labels = 2 * torch.eye(batch_size, device=device) - torch.ones(
-                    batch_size, batch_size, device=device
-                )
-
-                logits = (logits_per_image + logits_per_text) / 2.0
-                loss = -torch.sum(F.logsigmoid(logits * labels))
-        else:
-            all_image_features, all_text_features = gather_features(
-                image_features,
-                text_features,
-                local_loss=self.local_loss,
-                gather_with_grad=True,
-                rank=rank,
-                world_size=world_size,
-            )
-
-            if self.gather_loss:
-                if self.local_loss:
-                    logits_per_image = (
-                        self.logit_scale * image_features @ all_text_features.T
-                    )
-                    logits_per_text = (
-                        self.logit_scale * text_features @ all_image_features.T
-                    )
-                else:
-                    logits_per_image = (
-                        self.logit_scale * all_image_features @ all_text_features.T
-                    )
-                    logits_per_text = logits_per_image.T
-            else:
-                logits_per_image = self.logit_scale * image_features @ text_features.T
-                logits_per_text = self.logit_scale * text_features @ image_features.T
-
-            image_loss = F.cross_entropy(logits_per_image, labels)
-            text_loss = F.cross_entropy(logits_per_text, labels)
+            image_loss = F.cross_entropy(logits_per_image, labels_ce)
+            text_loss = F.cross_entropy(logits_per_text, labels_ce)
 
             loss = (image_loss + text_loss) / 2.0
-            logits = ((logits_per_image + logits_per_text) / 2.0,)
+            logits = (logits_per_image + logits_per_text) / 2.0 # Logits để đánh giá
 
         ret = {
             "loss": loss,
@@ -263,9 +202,9 @@ def gather_features(
     rank=0,
     world_size=1,
 ):
-    assert (
-        has_distributed
-    ), "torch.distributed did not import correctly, please use a PyTorch version with support."
+    # assert (
+    #     has_distributed
+    # ), "torch.distributed did not import correctly, please use a PyTorch version with support."
 
     if not (has_distributed and dist.is_initialized()):
         return image_features, text_features
