@@ -165,6 +165,7 @@ def main():
             image = sample["image"].to(device=device)
             with torch.inference_mode():
                 image_features = model.encode_image(image)
+                print(f"image_features.shape: {image_features.shape}")
                 text_features = model.encode_text(input_id, attention_mask)
             txt_feats_all.append(text_features.detach().cpu())
             img_feats_all.append(image_features.detach().cpu())

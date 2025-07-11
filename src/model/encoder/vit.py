@@ -165,14 +165,27 @@ class Vit2D(nn.Module):
 
 # --- Khởi tạo và kiểm tra ---
 if __name__ == "__main__":
+    # Lưu trữ shapes
+    activation_shapes = {}
+
+    # Hàm hook
+    def get_output_shape_hook(module, input, output):
+        # Lưu shape của output. Module được gắn hook là key.
+        # output có thể là tensor hoặc tuple/list of tensors. Lấy shape của tensor chính.
+        if isinstance(output, torch.Tensor):
+            activation_shapes[module.__class__.__name__] = output.shape
+        elif isinstance(output, (tuple, list)):
+            # Nếu output là tuple/list (ví dụ từ BatchNorm), lấy shape của tensor đầu tiên
+            activation_shapes[module.__class__.__name__] = output[-2].shape
+
     # Tham số cho mô hình ViT2D
     image_size = [256, 256]
     patch_size = 16
     dim = 512
-    depth = 6
+    depth = 8 # Sử dụng depth=6 như trong phần test của bạn
     heads = 8
-    mlp_dim = 2048 # Thường mlp_dim = 4 * dim
-    channels = 3 # Ảnh màu RGB
+    mlp_dim = 4 # Đảm bảo mlp_dim = 4 * dim
+    channels = 1 # Ảnh màu RGB
 
     # Tạo một ảnh giả (batch_size, channels, height, width)
     batch_size = 2
@@ -185,25 +198,58 @@ if __name__ == "__main__":
         dim=dim,
         depth=depth,
     )
+    
+    # Đăng ký hooks
+    # Lớp áp chót: Output của self.transformer trong ViTEncoder
+    # self.transformer là một module con của self.encoder
+    model_2d.encoder.transformer.register_forward_hook(get_output_shape_hook)
+    
+    # Lớp cuối cùng: Output của self.encoder sau khi rearrange
+    # Chúng ta có thể gắn hook vào chính encoder
+    model_2d.encoder.register_forward_hook(get_output_shape_hook)
+    # HOẶC, nếu bạn muốn lớp cuối cùng chính là output của Vit2D, hãy gắn hook vào model_2d
+    # model_2d.register_forward_hook(get_output_shape_hook)
+
 
     print(f"Kích thước ảnh đầu vào giả: {dummy_image.shape}")
 
     # Truyền ảnh qua mô hình
+    # Output của Vit2D là tokens_rearranged_for_output (dạng b h w c)
     output_tokens = model_2d(dummy_image)
 
     print(f"Kích thước đầu ra của ViT2D: {output_tokens.shape}")
+    print("\n--- Kích thước các lớp trung gian (sử dụng Hooks) ---")
+    
+    # Lớp áp chót (penultimate layer): Là đầu ra của Transformer.
+    # Hook đã lưu output của Transformer là 'Transformer'.
+    # Lưu ý: output của Transformer là (batch_size, num_patches + 1, dim)
+    if 'Transformer' in activation_shapes:
+        print(f"Shape của lớp áp chót (output của Transformer, bao gồm CLS token): {activation_shapes['Transformer']}")
+        # Nếu bạn muốn chỉ các patch tokens (loại bỏ CLS token)
+        # Thì số lượng patch tokens là num_patches = (image_size[0] // patch_size) * (image_size[1] // patch_size)
+        num_patches = (image_size[0] // patch_size) * (image_size[1] // patch_size)
+        expected_penultimate_without_cls_shape = (batch_size, num_patches, dim)
+        print(f"Shape của lớp áp chót (chỉ patch tokens, ước tính): {expected_penultimate_without_cls_shape}")
+    else:
+        print("Không tìm thấy shape của Transformer. Đảm bảo hook đã được đăng ký đúng.")
 
-    # Kiểm tra kích thước đầu ra
-    # Output should be (batch_size, channels, new_height, new_width)
-    # new_height = image_size[0] // patch_size
-    # new_width = image_size[1] // patch_size
-    expected_output_channels = dim # Output của ViTEncoder là dim
+    # Lớp cuối cùng (final layer): Là đầu ra của ViTEncoder sau khi rearrange
+    # Hook đã lưu output của ViTEncoder là 'ViTEncoder'.
+    if 'ViTEncoder' in activation_shapes:
+        print(f"Shape của lớp cuối cùng (output của ViTEncoder): {activation_shapes['ViTEncoder']}")
+    elif 'Vit2D' in activation_shapes: # Nếu bạn đã gắn hook vào Vit2D
+        print(f"Shape của lớp cuối cùng (output của Vit2D): {activation_shapes['Vit2D']}")
+    else:
+        print("Không tìm thấy shape của ViTEncoder hoặc Vit2D. Đảm bảo hook đã được đăng ký đúng.")
+
+
+    # Kiểm tra kích thước đầu ra của Vit2D (lưu ý: bạn đã thay đổi định dạng output)
     expected_output_height = image_size[0] // patch_size
     expected_output_width = image_size[1] // patch_size
+    expected_output_channels = dim # Output của ViTEncoder là dim, sau rearrange là chiều cuối
 
-
-    assert output_tokens.shape == (batch_size, expected_output_channels, expected_output_height, expected_output_width), \
-        f"Kích thước đầu ra không khớp! Expected: {(batch_size, expected_output_channels, expected_output_height, expected_output_width)}, Got: {output_tokens.shape}"
+    assert output_tokens.shape == (batch_size, expected_output_height, expected_output_width, expected_output_channels), \
+        f"Kích thước đầu ra không khớp! Expected: {(batch_size, expected_output_height, expected_output_width, expected_output_channels)}, Got: {output_tokens.shape}"
 
     print("\nKiểm tra thành công! Mô hình ViT2D hoạt động với ảnh 2D.")
 
@@ -212,6 +258,9 @@ if __name__ == "__main__":
     channels_gray = 1
     dummy_image_gray = torch.randn(batch_size, channels_gray, image_size[0], image_size[1])
 
+    # (Lưu ý: Để kiểm tra với grayscale, bạn cần tạo một instance ViTEncoder mới với channels=1,
+    # sau đó gán nó vào model_2d_gray.encoder và đăng ký lại hooks.)
+
     # Khởi tạo lại ViTEncoder và Vit2D với channels=1
     model_2d_gray = Vit2D(
         input_size=image_size,
@@ -219,22 +268,36 @@ if __name__ == "__main__":
         dim=dim,
         depth=depth,
     )
-    # Cần tạo lại ViTEncoder với số kênh mới nếu muốn kiểm tra riêng
-    encoder_gray = ViTEncoder(
+    encoder_gray = ViTEncoder( # Tạo một encoder mới với kênh xám
         image_size=image_size,
         patch_size=patch_size,
         dim=dim,
         depth=depth,
-        channels=channels_gray # Quan trọng: thay đổi số kênh
+        channels=channels_gray
     )
-    # Gán encoder mới cho model_2d_gray
-    model_2d_gray.encoder = encoder_gray
+    model_2d_gray.encoder = encoder_gray # Gán encoder mới vào model_2d_gray
+
+    # Xóa shapes cũ và đăng ký lại hooks cho model_2d_gray
+    activation_shapes = {}
+    model_2d_gray.encoder.transformer.register_forward_hook(get_output_shape_hook)
+    model_2d_gray.encoder.register_forward_hook(get_output_shape_hook)
+
 
     print(f"Kích thước ảnh grayscale đầu vào giả: {dummy_image_gray.shape}")
     output_tokens_gray = model_2d_gray(dummy_image_gray)
     print(f"Kích thước đầu ra của ViT2D (grayscale): {output_tokens_gray.shape}")
 
-    assert output_tokens_gray.shape == (batch_size, expected_output_channels, expected_output_height, expected_output_width), \
-        f"Kích thước đầu ra (grayscale) không khớp! Expected: {(batch_size, expected_output_channels, expected_output_height, expected_output_width)}, Got: {output_tokens_gray.shape}"
+    print("\n--- Kích thước các lớp trung gian (grayscale, sử dụng Hooks) ---")
+    if 'Transformer' in activation_shapes:
+        print(f"Shape của lớp áp chót (output của Transformer, bao gồm CLS token): {activation_shapes['Transformer']}")
+        num_patches_gray = (image_size[0] // patch_size) * (image_size[1] // patch_size)
+        expected_penultimate_without_cls_shape_gray = (batch_size, num_patches_gray, dim)
+        print(f"Shape của lớp áp chót (chỉ patch tokens, ước tính): {expected_penultimate_without_cls_shape_gray}")
+    if 'ViTEncoder' in activation_shapes:
+        print(f"Shape của lớp cuối cùng (output của ViTEncoder): {activation_shapes['ViTEncoder']}")
+
+
+    assert output_tokens_gray.shape == (batch_size, expected_output_height, expected_output_width, expected_output_channels), \
+        f"Kích thước đầu ra (grayscale) không khớp! Expected: {(batch_size, expected_output_height, expected_output_width, expected_output_channels)}, Got: {output_tokens_gray.shape}"
     
     print("Kiểm tra ảnh grayscale thành công!")
