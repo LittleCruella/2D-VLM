@@ -103,7 +103,7 @@ class TrainingArguments(transformers.TrainingArguments):
     # config in bash file
     bf16: bool = True
     output_dir: str = "./output/CLIP"
-    num_train_epochs: int = 10
+    num_train_epochs: int = 1
     per_device_train_batch_size: int = 32
     per_device_eval_batch_size: int = 4
     gradient_accumulation_steps: int = 1

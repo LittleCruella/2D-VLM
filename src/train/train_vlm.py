@@ -31,7 +31,7 @@ def rank0_print(*args):
 class ModelArguments:
     wb_name: Optional[str] = field(default="MLLM")
     model_name_or_path: Optional[str] = field(
-        default="Qwen/Qwen2.5-7B-Instruct",
+        default="Qwen/Qwen2.5-1.5B-Instruct",
         metadata={"help": "Path to the LLM or MLLM."},
     )
     model_type: Optional[str] = field(default="vlm_qwen")
@@ -112,7 +112,7 @@ class DataArguments:
         default="./data/M3D-VQA/M3D_VQA_yn_train.csv",
         metadata={"help": "Path to training VQA Yes or No data."},
     )
-
+    input_image: tuple = field(default=(256, 256))
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
@@ -252,6 +252,7 @@ def find_all_linear_names(model):
 @dataclass
 class DataCollator:
     def __call__(self, batch: list) -> dict:
+        print(batch)
         images, input_ids, labels, attention_mask = tuple(
             [b[key] for b in batch]
             for key in ("image", "input_id", "label", "attention_mask")
@@ -402,10 +403,16 @@ def main():
 
     if model_args.tune_mm_mlp_adapter:
         train_dataset = TextDatasets(data_args, tokenizer, mode="train")
+        print("Using TextDatasets for training.")
+        print("train_dataset length: ", len(train_dataset))
+        print("train_dataset example: ", train_dataset[0])
     else:
         train_dataset = TextYNDatasets(data_args, tokenizer, mode="train")
 
     eval_dataset = CapDataset(data_args, tokenizer, mode="validation")
+    print("Using CapDataset for evaluation.")
+    print("eval_dataset length: ", len(eval_dataset))
+    print("eval_dataset example: ", eval_dataset[0])
     data_collator = DataCollator()
 
     rank0_print("=" * 20 + " Training " + "=" * 20)

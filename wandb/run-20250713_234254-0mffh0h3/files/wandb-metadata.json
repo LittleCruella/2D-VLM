@@ -1,0 +1,40 @@
+{
+  "os": "Windows-11-10.0.26100-SP0",
+  "python": "CPython 3.12.6",
+  "startedAt": "2025-07-13T16:42:54.028535Z",
+  "program": "C:\\Users\\Admin\\Desktop\\2D-VLM\\src\\train\\train_vlm.py",
+  "codePath": "src\\train\\train_vlm.py",
+  "codePathLocal": "src\\train\\train_vlm.py",
+  "git": {
+    "remote": "https://github.com/LittleCruella/2D-VLM.git",
+    "commit": "7d92d1b781ea0e55952240b90f7784728f9506c8"
+  },
+  "email": "hatuanphong22092003@gmail.com",
+  "root": "C:\\Users\\Admin\\Desktop\\2D-VLM",
+  "host": "DESKTOP-0HR46SC",
+  "executable": "C:\\Users\\Admin\\Desktop\\2D-VLM\\.venv\\Scripts\\python.exe",
+  "cpu_count": 20,
+  "cpu_count_logical": 28,
+  "gpu": "NVIDIA GeForce RTX 4070",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "999218475008",
+      "used": "551301255168"
+    }
+  },
+  "memory": {
+    "total": "34118234112"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4070",
+      "memoryTotal": "12878610432",
+      "cudaCores": 5888,
+      "architecture": "Ada",
+      "uuid": "GPU-f9aad1e3-d802-efd6-1654-e6a8213fa0ff"
+    }
+  ],
+  "cudaVersion": "12.8",
+  "writerId": "xq47ek3q53edrdkuhhri2k0g5vg5fex6"
+}

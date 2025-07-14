@@ -1,0 +1,66 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            7dnto501g4c1p3lw4imeonfste12i7hu:
+                codePath: src\train\train_vlm.py
+                codePathLocal: src\train\train_vlm.py
+                cpu_count: 20
+                cpu_count_logical: 28
+                cudaVersion: "12.8"
+                disk:
+                    /:
+                        total: "999218475008"
+                        used: "551359111168"
+                email: hatuanphong22092003@gmail.com
+                executable: C:\Users\Admin\Desktop\2D-VLM\.venv\Scripts\python.exe
+                git:
+                    commit: 7d92d1b781ea0e55952240b90f7784728f9506c8
+                    remote: https://github.com/LittleCruella/2D-VLM.git
+                gpu: NVIDIA GeForce RTX 4070
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 5888
+                      memoryTotal: "12878610432"
+                      name: NVIDIA GeForce RTX 4070
+                      uuid: GPU-f9aad1e3-d802-efd6-1654-e6a8213fa0ff
+                host: DESKTOP-0HR46SC
+                memory:
+                    total: "34118234112"
+                os: Windows-11-10.0.26100-SP0
+                program: C:\Users\Admin\Desktop\2D-VLM\src\train\train_vlm.py
+                python: CPython 3.12.6
+                root: C:\Users\Admin\Desktop\2D-VLM
+                startedAt: "2025-07-13T17:02:52.366880Z"
+                writerId: 7dnto501g4c1p3lw4imeonfste12i7hu
+        m: []
+        python_version: 3.12.6
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 48
+                - 49
+                - 53
+                - 71
+            "2":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 48
+                - 49
+                - 53
+                - 71
+            "3":
+                - 13
+            "4": 3.12.6
+            "5": 0.21.0
+            "6": 4.53.1
+            "8":
+                - 3
+            "12": 0.21.0
+            "13": windows-amd64
