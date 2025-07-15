@@ -34,7 +34,7 @@ def seed_everything(seed):
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", type=str, default="output/CLIP"
+        "--model_name_or_path", type=str, default="output/CLIP_test"
     )
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"])
@@ -52,11 +52,10 @@ def parse_args(args=None):
         type=tuple,
         default=(
             "recall",
-            "accuracy",
         ),  # ("recall", "precision", "f1_score", "accuracy")
     )
-    parser.add_argument("--test_topk", type=tuple, default=(1, 5))
-    parser.add_argument("--test_size", type=tuple, default=(100,)) # (100, 500, 1000, 2000)
+    parser.add_argument("--test_topk", type=tuple, default=(1, 5, 10))
+    parser.add_argument("--test_size", type=tuple, default=(100, 500)) # (100, 500, 1000, 2000)
     parser.add_argument("--input_image", type=tuple, default=(256, 256))
     return parser.parse_args(args)
 
@@ -79,7 +78,7 @@ def calculate_recall(similarity_matrix, k):
         recall_at_k = correct_matches.any(dim=1).float().mean()  # [10]
         recalls.append(recall_at_k)
 
-    return sum(recalls) / len(recalls)  # shape: [5] - recall@k cho từng lát
+    return float(sum(recalls) / len(recalls))  # shape: [5] - recall@k cho từng lát
     # return recall_at_k
 
 
@@ -167,6 +166,7 @@ def main():
                 image_features = model.encode_image(image)
                 print(f"image_features.shape: {image_features.shape}")
                 text_features = model.encode_text(input_id, attention_mask)
+                print(f"text_features.shape: {text_features.shape}")
             txt_feats_all.append(text_features.detach().cpu())
             img_feats_all.append(image_features.detach().cpu())
 
@@ -174,12 +174,16 @@ def main():
         img_feats_all = torch.cat(img_feats_all, dim=0)
 
         scores_mat = torch.matmul(img_feats_all, txt_feats_all.transpose(0, 1))
-
         for test_method in args.test_method:
             for test_topk in args.test_topk:
                 if test_method == "recall":
                     i_to_t = calculate_recall(scores_mat, test_topk)
-                    t_to_i = calculate_recall(scores_mat.transpose(0, 1), test_topk)
+                    # print(f"score_mat.shape: {scores_mat.shape}")   
+                    # print(f"score_mat.T.shape: {scores_mat.T.shape}")
+                    # print(f"score_mat.tran.shape: {scores_mat.transpose(0, 1).shape}")
+                    # print(f"score_mat.tran: {scores_mat.transpose(0, 1)}")
+                    # t_to_i = calculate_recall(scores_mat.transpose(0, 1), test_topk)
+                    t_to_i = calculate_recall(scores_mat.transpose(1, 2), test_topk)
                     print(f"IR_{test_topk}@{test_size}: ", i_to_t)
                     print(f"TR_{test_topk}@{test_size}: ", t_to_i)
                     results[f"IR_{test_topk}@{test_size}"] = i_to_t

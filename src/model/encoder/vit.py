@@ -160,6 +160,7 @@ class Vit2D(nn.Module):
         # tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h = h, w = w)
         # print(f"Output shape of Vit2D: {tokens.shape}")  # Debugging line
         tokens = rearrange(tokens, "b c h w -> b h w c")  # Đảm bảo tokens có dạng (batch_size, height, width, channels)
+        # tokens, _ = pack([tokens], "h * w")
         return tokens
 
 

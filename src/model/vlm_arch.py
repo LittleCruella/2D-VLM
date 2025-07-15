@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from transformers import AutoModel
+from einops import rearrange
 
 from .CLIP import *
 from .encoder.builder import build_vision_tower
@@ -160,7 +161,10 @@ class VLMMetaForCausalLM(ABC):
             )
         else:
             image_features = self.encode_images(images)
+            image_features = rearrange(image_features, "b p1 p2 d -> b (p1 p2) d")
             inputs_embeds = self.get_model().embed_tokens(input_ids)
+            # print(f"Image features shape: {image_features.shape}")
+            # print(f"Input embeddings shape: {inputs_embeds.shape}")
             inputs_embeds = torch.cat(
                 (
                     inputs_embeds[:, :1, :],

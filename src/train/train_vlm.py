@@ -252,7 +252,6 @@ def find_all_linear_names(model):
 @dataclass
 class DataCollator:
     def __call__(self, batch: list) -> dict:
-        print(batch)
         images, input_ids, labels, attention_mask = tuple(
             [b[key] for b in batch]
             for key in ("image", "input_id", "label", "attention_mask")
@@ -403,16 +402,16 @@ def main():
 
     if model_args.tune_mm_mlp_adapter:
         train_dataset = TextDatasets(data_args, tokenizer, mode="train")
-        print("Using TextDatasets for training.")
-        print("train_dataset length: ", len(train_dataset))
-        print("train_dataset example: ", train_dataset[0])
+        # print("Using TextDatasets for training.")
+        # print("train_dataset length: ", len(train_dataset))
+        # print("train_dataset example: ", train_dataset[0])
     else:
         train_dataset = TextYNDatasets(data_args, tokenizer, mode="train")
 
     eval_dataset = CapDataset(data_args, tokenizer, mode="validation")
-    print("Using CapDataset for evaluation.")
-    print("eval_dataset length: ", len(eval_dataset))
-    print("eval_dataset example: ", eval_dataset[0])
+    # print("Using CapDataset for evaluation.")
+    # print("eval_dataset length: ", len(eval_dataset))
+    # print("eval_dataset example: ", eval_dataset[0])
     data_collator = DataCollator()
 
     rank0_print("=" * 20 + " Training " + "=" * 20)

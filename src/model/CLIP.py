@@ -127,8 +127,9 @@ class DEC_CLIP(PreTrainedModel):
 
     def forward(self, images, input_ids, attention_mask, labels, **kwargs):
         image_features = self.encode_image(images)
+        print(f"image_features.shape: {image_features.shape}")
         text_features = self.encode_text(input_ids, attention_mask)
-
+        print(f"text_features.shape: {text_features.shape}")
         # Removed distributed and dist related code
         # rank = 0
         # world_size = 1

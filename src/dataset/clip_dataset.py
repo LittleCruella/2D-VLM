@@ -17,7 +17,7 @@ class CLIPDataset(Dataset):
         self.tokenizer = tokenizer
         self.mode = mode
 
-        with open(args.cap_data_path, 'r') as file:
+        with open(args.cap_data_path, 'r', encoding='utf-8') as file:
             self.json_file = json.load(file)
         self.data_list = self.json_file[mode]
 

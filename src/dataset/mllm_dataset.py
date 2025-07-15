@@ -67,7 +67,7 @@ class CapDataset(Dataset):
         max_attempts = 100
         for _ in range(max_attempts):
             try:
-                print(f"Processing index: {idx}")
+                # print(f"Processing index: {idx}")
                 data = self.data_list[idx]
                 image_path = data["image"]
                 image_abs_path = os.path.join(self.data_root, image_path)
@@ -82,7 +82,7 @@ class CapDataset(Dataset):
                 # Apply the transformations
                 image = self.transform(image)
 
-                print(f"Image shape after transform: {image.shape}")
+                # print(f"Image shape after transform: {image.shape}")
 
                 # Process the caption text
                 raw_text = data["text"]
