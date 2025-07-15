@@ -42,7 +42,6 @@ class CLIPTrainer(Trainer):
             outputs = model(**inputs)
             loss = outputs["loss"]
             logits = outputs["logits"]
-
             if prediction_loss_only:
                 return (loss, None, None)
 
