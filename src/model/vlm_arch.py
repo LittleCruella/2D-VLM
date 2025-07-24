@@ -161,7 +161,7 @@ class VLMMetaForCausalLM(ABC):
             )
         else:
             image_features = self.encode_images(images)
-            image_features = rearrange(image_features, "b p1 p2 d -> b (p1 p2) d")
+            # image_features = rearrange(image_features, "b p1 p2 d -> b (p1 p2) d")
             inputs_embeds = self.get_model().embed_tokens(input_ids)
             # print(f"Image features shape: {image_features.shape}")
             # print(f"Input embeddings shape: {inputs_embeds.shape}")

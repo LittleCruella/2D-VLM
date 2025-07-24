@@ -96,15 +96,15 @@ class DataArguments:
 
     # VQA data
     vqa_data_train_path: str = field(
-        default="./data/M3D-VQA/M3D_VQA_train.csv",
+        default="data/vqa_rad/train_with_images.csv",
         metadata={"help": "Path to training VQA data."},
     )
     vqa_data_val_path: str = field(
-        default="./data/M3D-VQA/M3D_VQA_val.csv",
+        default="data/vqa_rad/val_with_images.csv",
         metadata={"help": "Path to validation VQA data."},
     )
     vqa_data_test_path: str = field(
-        default="./data/M3D-VQA/M3D_VQA_test.csv",
+        default="data/vqa_rad/test_with_images.csv",
         metadata={"help": "Path to testing VQA data."},
     )
 
@@ -138,8 +138,8 @@ class TrainingArguments(transformers.TrainingArguments):
 
     # This is set up to facilitate debugging, pls config these in bash file in training.
     bf16: bool = True
-    output_dir: str = "./output/Med3DVLM-pretrain-test"
-    num_train_epochs: float = 1
+    output_dir: str = "./output/Med2DVLM-pretrain"
+    num_train_epochs: float = 5
     per_device_train_batch_size: int = 1
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 1

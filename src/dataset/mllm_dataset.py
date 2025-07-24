@@ -6,6 +6,7 @@ import numpy as np
 # import monai.transforms as mtf
 import SimpleITK as sitk
 import pandas as pd
+import monai.transforms as mtf
 from monai.data import set_track_meta
 from torch.utils.data import Dataset, ConcatDataset
 from src.dataset.prompt_templates import Caption_templates
@@ -21,7 +22,7 @@ class CapDataset(Dataset):
         self.mode = mode
         self.image_tokens = "<im_patch>" * args.proj_out_num
 
-        with open(args.cap_data_path, "r") as file:
+        with open(args.cap_data_path, "r", encoding='utf-8') as file:
             self.json_file = json.load(file)
         self.data_list = self.json_file[mode]
 
@@ -74,13 +75,27 @@ class CapDataset(Dataset):
 
                 # Read image using SimpleITK
                 image = sitk.ReadImage(image_abs_path)
-                image = sitk.GetArrayFromImage(image)
-
+                image = sitk.GetArrayFromImage(image) # H, W, C
+                if image.ndim == 3:
+                    image = image.mean(-1)
+                # print(f"Image shape before transform: {image.shape}")
                 # Convert numpy array to PIL Image before applying transforms
-                image = Image.fromarray(image[0])  # Assuming image is 3D and selecting the first channel
+                # image = Image.fromarray(image[0])  # Assuming image is 3D and selecting the first channel
 
+  
+                # Chuyển đổi sang kiểu uint8 nếu cần thiết
+                # if image.dtype != np.uint8:
+                #     image_min = image.min()
+                #     image_max = image.max()
+                #     if image_max > image_min:
+                #         image = ((image - image_min) / (image_max - image_min) * 255).astype(np.uint8)
+                #     else:
+                #         image = np.zeros_like(image, dtype=np.uint8)
+
+                image_pil = Image.fromarray(image)
+                # print(f"Image shape after conversion to PIL: {image_pil.size}")
                 # Apply the transformations
-                image = self.transform(image)
+                image_tensor = self.transform(image_pil)
 
                 # print(f"Image shape after transform: {image.shape}")
 
@@ -127,7 +142,7 @@ class CapDataset(Dataset):
                     label[label == self.tokenizer.pad_token_id] = -100
 
                 ret = {
-                    "image": image,
+                    "image": image_tensor,
                     "input_id": input_id,
                     "label": label,
                     "attention_mask": attention_mask,
@@ -160,6 +175,11 @@ class VQADataset(Dataset):
             self.data_list = pd.read_csv(args.vqa_data_test_path)
         else:
             print("The mode is not desired ! ")
+        
+        if len(self.args.input_image) >= 2:
+            target_image_size = (self.args.input_image[0], self.args.input_image[1])
+        else:
+            raise ValueError("input_image in ModelArguments must specify at least H and W dimensions (e.g., (256, 256) or (256, 256, 128)).")
 
         # Transforms for training
         train_transform = T.Compose(
@@ -208,29 +228,43 @@ class VQADataset(Dataset):
         for _ in range(max_attempts):
             try:
                 data = self.data_list.iloc[idx]
-                image_abs_path = os.path.join(self.args.data_root, data["Image Path"])
+                image_abs_path = os.path.join(self.args.data_root, data["image"])
 
                 # image = np.load(image_abs_path)  # nomalized, 0-1, C,D,H,W
                 # image = np.load(img_path)[np.newaxis, ...]  # nomalized
                 image = sitk.ReadImage(image_abs_path)
                 image = sitk.GetArrayFromImage(image)
-                image = np.expand_dims(image, axis=0)
-                image = self.transform(image)
+                # image = np.expand_dims(image, axis=0)
+                # if image.dtype != np.uint8:
+                #     image_min = image.min()
+                #     image_max = image.max()
+                #     if image_max > image_min:
+                #         image = ((image - image_min) / (image_max - image_min) * 255).astype(np.uint8)
+                #     else: # Handle cases where image is constant (e.g., all zeros)
+                #         image = np.zeros_like(image, dtype=np.uint8)
 
-                if self.close_ended:
-                    question = data["Question"]
-                    choices = "Choices: A. {} B. {} C. {} D. {}".format(
-                        data["Choice A"],
-                        data["Choice B"],
-                        data["Choice C"],
-                        data["Choice D"],
-                    )
-                    question = question + " " + choices
-                    answer = "{}. {}".format(data["Answer Choice"], data["Answer"])
-                else:
-                    question = data["Question"]
-                    answer = str(data["Answer"])
+                if image.ndim == 3:
+                    image = image.mean(-1)  # Convert to grayscale if needed
 
+                image_pil = Image.fromarray(image)
+                # Apply the transformations
+                image_tensor = self.transform(image_pil)
+
+                # if self.close_ended:
+                #     question = data["Question"]
+                #     choices = "Choices: A. {} B. {} C. {} D. {}".format(
+                #         data["Choice A"],
+                #         data["Choice B"],
+                #         data["Choice C"],
+                #         data["Choice D"],
+                #     )
+                #     question = question + " " + choices
+                #     answer = "{}. {}".format(data["Answer Choice"], data["Answer"])
+                # else:
+                #     question = data["Question"]
+                #     answer = str(data["Answer"])
+                question = data["question"]
+                answer = str(data["answer"])
                 question = self.image_tokens + " " + question
                 text_tensor = self.tokenizer(
                     question + " " + answer,
@@ -266,14 +300,14 @@ class VQADataset(Dataset):
                     label[label == self.tokenizer.pad_token_id] = -100
 
                 ret = {
-                    "image": image,
+                    "image": image_tensor,
                     "input_id": input_id,
                     "label": label,
                     "attention_mask": attention_mask,
                     "question": question,
                     "answer": answer,
-                    "answer_choice": data["Answer Choice"],
-                    "question_type": data["Question Type"],
+                    # "answer_choice": data["Answer Choice"],
+                    "question_type": "VQA",
                 }
 
                 # if self.args.seg_enable:
@@ -422,7 +456,7 @@ class TextDatasets(Dataset):
         super(TextDatasets, self).__init__()
         self.ds_list = [
             CapDataset(args, tokenizer, mode),
-            # VQADataset(args, tokenizer, close_ended=True, mode=mode),
+            VQADataset(args, tokenizer, close_ended=True, mode=mode),
             # VQADataset(args, tokenizer, close_ended=False, mode=mode),
         ]
         self.dataset = ConcatDataset(self.ds_list)

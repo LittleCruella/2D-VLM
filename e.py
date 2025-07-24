@@ -2,9 +2,13 @@ import json
 import os
 import random
 
-def convert_txt_to_json(input_txt_file, output_json_file="data.json",
-                         train_ratio=0.8, validation_ratio=0.1, test_ratio=0.05,
-                         image_prefix="test/non-radiology/images/"):
+def convert_txt_to_json(train_txt_file, 
+                        val_txt_file,
+                        test_txt_file,
+                        output_json_file,
+                        train_image_prefix, 
+                        val_image_prefix, 
+                        test_image_prefix):
     """
     Chuyển đổi file .txt (dạng image_name\tcaption) thành file JSON
     với các tập 'train', 'validation', và 'test' dựa trên tỷ lệ đã cho.
@@ -19,14 +23,11 @@ def convert_txt_to_json(input_txt_file, output_json_file="data.json",
         image_prefix (str): Tiền tố để thêm vào tên ảnh (ví dụ: "flickr30k_images/").
                              Giúp khớp với định dạng JSON mong muốn.
     """
-    if not (0.0 <= train_ratio <= 1.0 and
-            0.0 <= validation_ratio <= 1.0 and
-            0.0 <= test_ratio <= 1.0):
-        raise ValueError("Tỷ lệ cho Train, Validation, Test phải nằm trong khoảng từ 0.0 đến 1.0.")
 
-    all_data = []
+
+    all_data_train, all_data_val, all_data_test = [], [], []
     try:
-        with open(input_txt_file, 'r', encoding='utf-8') as f:
+        with open(train_txt_file, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -38,10 +39,14 @@ def convert_txt_to_json(input_txt_file, output_json_file="data.json",
                     caption = parts[1].strip()
 
                     # Thêm tiền tố và đuôi .jpg cho đường dẫn ảnh
-                    full_image_path = image_prefix + image_id + ".jpg"
-                    all_data.append({"image": full_image_path, "text": caption})
-                else:
-                    print(f"Cảnh báo: Bỏ qua dòng bị lỗi định dạng: {line}")
+                    full_image_path = os.path.join(train_image_prefix, image_id + ".jpg")
+                    full_image_path = "data/" + full_image_path
+                    temp_image_path = f"data/{full_image_path}"
+                    if os.path.exists(temp_image_path):
+                        all_data_train.append({"image": full_image_path, "text": caption})
+                    else:
+                        print(f"Cảnh báo: Không tìm thấy ảnh: {temp_image_path}, bỏ qua.")
+                        continue
 
     except FileNotFoundError:
         print(f"Lỗi: Không tìm thấy file đầu vào '{input_txt_file}'.")
@@ -50,22 +55,77 @@ def convert_txt_to_json(input_txt_file, output_json_file="data.json",
         print(f"Đã xảy ra lỗi khi đọc file: {e}")
         return
 
+    try:
+        with open(val_txt_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue # Bỏ qua các dòng trống
+
+                parts = line.split('\t', 1)
+                if len(parts) == 2:
+                    image_id = parts[0].strip()
+                    caption = parts[1].strip()
+
+                    # Thêm tiền tố và đuôi .jpg cho đường dẫn ảnh
+                    full_image_path = os.path.join(val_image_prefix, image_id + ".jpg")
+                    full_image_path = "data/" + full_image_path
+                    temp_image_path = f"data/{full_image_path}"
+                    if os.path.exists(temp_image_path):
+                        all_data_val.append({"image": full_image_path, "text": caption})
+                    else:
+                        print(f"Cảnh báo: Không tìm thấy ảnh: {temp_image_path}, bỏ qua.")
+                        continue
+
+    except FileNotFoundError:
+        print(f"Lỗi: Không tìm thấy file đầu vào '{input_txt_file}'.")
+        return
+    except Exception as e:
+        print(f"Đã xảy ra lỗi khi đọc file: {e}")
+        return
+    
+    try:
+        with open(test_txt_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue # Bỏ qua các dòng trống
+
+                parts = line.split('\t', 1)
+                if len(parts) == 2:
+                    image_id = parts[0].strip()
+                    caption = parts[1].strip()
+
+                    # Thêm tiền tố và đuôi .jpg cho đường dẫn ảnh
+                    full_image_path = os.path.join(test_image_prefix, image_id + ".jpg")
+                    full_image_path = "data/" + full_image_path
+                    temp_image_path = f"data/{full_image_path}"
+                    if os.path.exists(temp_image_path):
+                        all_data_test.append({"image": full_image_path, "text": caption})
+                    else:
+                        print(f"Cảnh báo: Không tìm thấy ảnh: {temp_image_path}, bỏ qua.")
+                        continue
+
+    except FileNotFoundError:
+        print(f"Lỗi: Không tìm thấy file đầu vào '{input_txt_file}'.")
+        return
+    except Exception as e:
+        print(f"Đã xảy ra lỗi khi đọc file: {e}")
+        return
     # Xáo trộn dữ liệu để đảm bảo tính ngẫu nhiên khi chia
-    random.shuffle(all_data)
+    random.shuffle(all_data_train)
+    random.shuffle(all_data_val)
+    random.shuffle(all_data_test)
 
-    total_items = len(all_data)
+    total_items = len(all_data_train) + len(all_data_val) + len(all_data_test)
 
-    # Tính số lượng mục cho mỗi tập
-    num_train = int(total_items * train_ratio)
-    num_validation = int(total_items * validation_ratio)
-    num_test = int(total_items * test_ratio)
 
     # Chia dữ liệu thành các tập
     # Lưu ý: Các lát cắt (slicing) này đảm bảo không vượt quá kích thước của all_data
     # và các phần tử được lấy theo thứ tự từ danh sách đã xáo trộn.
-    train_set = all_data[:num_train]
-    validation_set = all_data[num_train : num_train + num_validation]
-    test_set = all_data[num_train + num_validation : num_train + num_validation + num_test]
+    train_set = all_data_train
+    validation_set = all_data_val
+    test_set = all_data_test
 
     output_data = {
         "train": train_set,
@@ -88,10 +148,11 @@ def convert_txt_to_json(input_txt_file, output_json_file="data.json",
 
 
 convert_txt_to_json(
-    input_txt_file='data/data/train/radiology/captions.txt', # Replace with your actual .txt file name
-    output_json_file='data/2D_Cap/2D_Cap.json',
-    train_ratio=0.0005,  # Adjust ratios as needed
-    validation_ratio=0.0005,
-    test_ratio=0.005,
-    image_prefix="data/train/radiology/images/" # Change this to your actual image directory prefix
+    train_txt_file="data/data/train/radiology/captions.txt", 
+    val_txt_file="data/data/validation/radiology/captions.txt", 
+    test_txt_file="data/data/test/radiology/captions.txt", 
+    output_json_file="data/2D_Cap/2D_Cap.json",
+    train_image_prefix="train/radiology/images/", 
+    val_image_prefix="validation/radiology/images/", 
+    test_image_prefix="test/radiology/images/"
 )

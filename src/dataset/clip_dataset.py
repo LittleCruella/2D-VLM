@@ -121,35 +121,36 @@ class CLIPDataset(Dataset):
                 image = sitk.GetArrayFromImage(image) # np.ndarray (D, H, W) or (H, W)
 
                 # Handle 3D image to 2D slice if necessary
-                if image.ndim == 3: # If image is 3D (D, H, W)
-                    # For training, randomly select a slice
-                    if self.mode == 'train':
-                        slice_idx = random.randint(0, image.shape[0] - 1)
-                    else: # For validation/test, pick the middle slice
-                        slice_idx = image.shape[0] // 2
-                    image = image[slice_idx, :, :] # Reduce to (H, W)
+                # if image.ndim == 3: # If image is 3D (D, H, W)
+                #     # For training, randomly select a slice
+                #     if self.mode == 'train':
+                #         slice_idx = random.randint(0, image.shape[0] - 1)
+                #     else: # For validation/test, pick the middle slice
+                #         slice_idx = image.shape[0] // 2
+                #     image = image[slice_idx, :, :] # Reduce to (H, W)
 
-                # Ensure image is 2D (H, W) for torchvision transforms.
-                # torchvision ToTensor expects (H, W) or (H, W, C) for numpy,
-                # and will convert to (C, H, W). For grayscale, it will be (1, H, W).
-                # Convert numpy array to PIL Image as torchvision transforms often operate on PIL Images.
-                # If your medical images have intensities outside 0-255, you might need to normalize
-                # them to 0-1 or 0-255 range before converting to PIL Image for best results.
-                # Or, apply transforms directly on numpy array and then convert to tensor manually.
-                # For simplicity, assuming image data is suitable for direct PIL conversion or normalization.
+                # # Ensure image is 2D (H, W) for torchvision transforms.
+                # # torchvision ToTensor expects (H, W) or (H, W, C) for numpy,
+                # # and will convert to (C, H, W). For grayscale, it will be (1, H, W).
+                # # Convert numpy array to PIL Image as torchvision transforms often operate on PIL Images.
+                # # If your medical images have intensities outside 0-255, you might need to normalize
+                # # them to 0-1 or 0-255 range before converting to PIL Image for best results.
+                # # Or, apply transforms directly on numpy array and then convert to tensor manually.
+                # # For simplicity, assuming image data is suitable for direct PIL conversion or normalization.
 
-                # Normalize image to [0, 255] and convert to uint8 for PIL, if it's float or out of range.
-                # This is a common step for medical images before applying standard image transforms.
-                if image.dtype != np.uint8:
-                    image_min = image.min()
-                    image_max = image.max()
-                    if image_max > image_min:
-                        image = ((image - image_min) / (image_max - image_min) * 255).astype(np.uint8)
-                    else: # Handle cases where image is constant (e.g., all zeros)
-                        image = np.zeros_like(image, dtype=np.uint8)
+                # # Normalize image to [0, 255] and convert to uint8 for PIL, if it's float or out of range.
+                # # This is a common step for medical images before applying standard image transforms.
+                # if image.dtype != np.uint8:
+                #     image_min = image.min()
+                #     image_max = image.max()
+                #     if image_max > image_min:
+                #         image = ((image - image_min) / (image_max - image_min) * 255).astype(np.uint8)
+                #     else: # Handle cases where image is constant (e.g., all zeros)
+                #         image = np.zeros_like(image, dtype=np.uint8)
 
-
-                image_pil = Image.fromarray(image, mode='L') # 'L' for grayscale
+                if image.ndim == 3:  # If image is 3D (D, H, W)
+                    image = image.mean(-1)
+                image_pil = Image.fromarray(image) # 'L' for grayscale
 
                 # print(f"DEBUG: Loaded image from {image_abs_path} with shape {image.shape}, converted to PIL with size {image_pil.size}")
                 # Apply transforms, including Resize

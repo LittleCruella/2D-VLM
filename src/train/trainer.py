@@ -23,6 +23,7 @@ class CLIPTrainer(Trainer):
         self, model, inputs, return_outputs=False, num_items_in_batch=None
     ):
         outputs = model(**inputs)
+        # print(f"outputs: {outputs}")
         loss = outputs["loss"]
 
         if is_rank_zero():

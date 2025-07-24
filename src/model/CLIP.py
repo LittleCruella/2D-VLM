@@ -80,7 +80,7 @@ class DEC_CLIP(PreTrainedModel):
         self.language_encoder = AutoModel.from_pretrained(
             config.language_model_name_or_path
         )
-
+ 
         self.mm_vision_proj = nn.Linear(
             512, config.hidden_size # Lưu ý: Đây là 512, không phải self.vision_encoder.channels[-1]
         )
@@ -127,9 +127,9 @@ class DEC_CLIP(PreTrainedModel):
 
     def forward(self, images, input_ids, attention_mask, labels, **kwargs):
         image_features = self.encode_image(images)
-        print(f"image_features.shape: {image_features.shape}")
+        # print(f"image_features.shape: {image_features.shape}")
         text_features = self.encode_text(input_ids, attention_mask)
-        print(f"text_features.shape: {text_features.shape}")
+        # print(f"text_features.shape: {text_features.shape}")
         # Removed distributed and dist related code
         # rank = 0
         # world_size = 1
@@ -157,9 +157,9 @@ class DEC_CLIP(PreTrainedModel):
             ) - torch.ones(batch_size, batch_size, device=image_features.device)
 
             logits = (logits_per_image + logits_per_text) / 2.0
-            logits = logits.mean(dim=1)  
-            print("logits.shape:", logits.shape)
-            print("labels_tensor.shape:", labels_tensor.shape)
+            # logits = (logits_per_image + logits_per_text).mean(dim=1)    
+            # print("logits.shape:", logits.shape)
+            # print("labels_tensor.shape:", labels_tensor.shape)
             loss = -torch.sum(F.logsigmoid(labels_tensor * logits)) / batch_size # Chia cho batch_size nếu muốn mean loss
 
         else: # self.loss_type != "sigmoid" (e.g., "cross_entropy" as in CLIP)

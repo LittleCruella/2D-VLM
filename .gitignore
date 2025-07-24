@@ -209,3 +209,5 @@ __marimo__/
 
 output/
 data/data
+data/vqa_rad/
+wandb

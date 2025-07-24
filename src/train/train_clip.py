@@ -36,7 +36,7 @@ def rank0_print(*args):
 class ModelArguments:
     wb_name: Optional[str] = field(default="CLIP")
     language_model_name_or_path: str = field(
-        default="google-bert/bert-base-uncased"
+        default="medicalai/ClinicalBERT"
     )
 
     efficient_loss: bool = field(
@@ -102,8 +102,8 @@ class TrainingArguments(transformers.TrainingArguments):
 
     # config in bash file
     bf16: bool = True
-    output_dir: str = "./output/CLIP_test"
-    num_train_epochs: int = 1
+    output_dir: str = "./output/CLIP"
+    num_train_epochs: int = 100
     per_device_train_batch_size: int = 32
     per_device_eval_batch_size: int = 4
     gradient_accumulation_steps: int = 1
@@ -111,7 +111,7 @@ class TrainingArguments(transformers.TrainingArguments):
     eval_accumulation_steps: int = 1
     eval_steps: float = 0.04
     save_strategy: str = "steps"
-    save_steps: int = 1000
+    save_steps: int = 25000
     save_total_limit: int = 1
     learning_rate: float = 1e-4
     weight_decay: float = 0.1

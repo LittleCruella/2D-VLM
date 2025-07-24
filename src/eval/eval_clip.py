@@ -51,7 +51,7 @@ def parse_args(args=None):
         "--test_method",
         type=tuple,
         default=(
-            "recall",
+            "accuracy",
         ),  # ("recall", "precision", "f1_score", "accuracy")
     )
     parser.add_argument("--test_topk", type=tuple, default=(1, 5, 10))
@@ -65,21 +65,9 @@ def calculate_recall(similarity_matrix, k):
     diagonal_indices = torch.arange(similarity_matrix.size(0)).to(
         similarity_matrix.device
     )
-    # print(f"topk_indices.shape: {topk_indices.shape}")
-    # print(f"diagonal_indices.shape: {diagonal_indices.view(-1,1).shape}")
-    # correct_matches = torch.eq(topk_indices, diagonal_indices.view(-1, 1)).any(dim=1)
-    # recall_at_k = correct_matches.float().sum(dim=1).mean()
-    recalls = []
-
-    for i in range(k):
-        topk_i = topk_indices[:, i:i+1, :]  # shape: [10, 10]
-        # print(f"topk_i.shape: {topk_i.shape}")
-        correct_matches = torch.eq(topk_i, diagonal_indices.view(-1,1))  # [10, 10] == [10, 1] → [10, 10]
-        recall_at_k = correct_matches.any(dim=1).float().mean()  # [10]
-        recalls.append(recall_at_k)
-
-    return float(sum(recalls) / len(recalls))  # shape: [5] - recall@k cho từng lát
-    # return recall_at_k
+    correct_matches = torch.eq(topk_indices, diagonal_indices.view(-1, 1))
+    recall_at_k = correct_matches.float().sum(dim=1).mean()
+    return recall_at_k
 
 
 def calculate_precision(similarity_matrix, k):
@@ -109,20 +97,9 @@ def calculate_accuracy(similarity_matrix, k):
     diagonal_indices = torch.arange(similarity_matrix.size(0)).to(
         similarity_matrix.device
     )
-    # print(f"topk_indices.shape: {topk_indices.shape}")
-    # print(f"diagonal_indices.shape: {diagonal_indices.view(-1,1).shape}")
-    # correct_matches = torch.eq(topk_indices, diagonal_indices.view(-1, 1)).any(dim=1)
-    # recall_at_k = correct_matches.float().sum(dim=1).mean()
-    accuracys = []
-
-    for i in range(k):
-        topk_i = topk_indices[:, i:i+1, :]  # shape: [10, 10]
-        # print(f"topk_i.shape: {topk_i.shape}")
-        correct_matches = torch.eq(topk_i, diagonal_indices.view(-1,1)).any(dim=1)  # [10, 10] == [10, 1] → [10, 10]
-        accuracy = correct_matches.float().mean()
-        accuracys.append(accuracy)
-
-    return sum(accuracys) / k  # shape: [5] - recall@k cho từng lát
+    correct_matches = torch.eq(topk_indices, diagonal_indices.view(-1, 1)).any(dim=1)
+    accuracy = correct_matches.float().mean()
+    return accuracy
     
 
 
@@ -164,9 +141,10 @@ def main():
             image = sample["image"].to(device=device)
             with torch.inference_mode():
                 image_features = model.encode_image(image)
-                print(f"image_features.shape: {image_features.shape}")
+                # image_features = image_features.sum(dim=1)  
+                # print(f"image_features.shape: {image_features.shape}")
                 text_features = model.encode_text(input_id, attention_mask)
-                print(f"text_features.shape: {text_features.shape}")
+                # print(f"text_features.shape: {text_features.shape}")
             txt_feats_all.append(text_features.detach().cpu())
             img_feats_all.append(image_features.detach().cpu())
 
@@ -174,6 +152,7 @@ def main():
         img_feats_all = torch.cat(img_feats_all, dim=0)
 
         scores_mat = torch.matmul(img_feats_all, txt_feats_all.transpose(0, 1))
+        print(f"scores_mat: {scores_mat}")
         for test_method in args.test_method:
             for test_topk in args.test_topk:
                 if test_method == "recall":
@@ -183,7 +162,7 @@ def main():
                     # print(f"score_mat.tran.shape: {scores_mat.transpose(0, 1).shape}")
                     # print(f"score_mat.tran: {scores_mat.transpose(0, 1)}")
                     # t_to_i = calculate_recall(scores_mat.transpose(0, 1), test_topk)
-                    t_to_i = calculate_recall(scores_mat.transpose(1, 2), test_topk)
+                    t_to_i = calculate_recall(scores_mat.transpose(0, 1), test_topk)
                     print(f"IR_{test_topk}@{test_size}: ", i_to_t)
                     print(f"TR_{test_topk}@{test_size}: ", t_to_i)
                     results[f"IR_{test_topk}@{test_size}"] = i_to_t
