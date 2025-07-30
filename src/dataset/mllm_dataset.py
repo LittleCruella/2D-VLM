@@ -60,10 +60,8 @@ class CapDataset(Dataset):
         elif "test" in mode:
             self.transform = val_transform
             self.data_list = self.data_list[:test_size]
-
     def __len__(self):
         return len(self.data_list)
-
     def __getitem__(self, idx):
         max_attempts = 100
         for _ in range(max_attempts):
@@ -175,7 +173,7 @@ class VQADataset(Dataset):
             self.data_list = pd.read_csv(args.vqa_data_test_path)
         else:
             print("The mode is not desired ! ")
-        
+
         if len(self.args.input_image) >= 2:
             target_image_size = (self.args.input_image[0], self.args.input_image[1])
         else:
@@ -222,7 +220,6 @@ class VQADataset(Dataset):
 
     def __len__(self):
         return len(self.data_list)
-
     def __getitem__(self, idx):
         max_attempts = 100
         for _ in range(max_attempts):
@@ -472,10 +469,10 @@ class TextYNDatasets(Dataset):
     def __init__(self, args, tokenizer, mode="train"):
         super(TextYNDatasets, self).__init__()
         self.ds_list = [
-            CapDataset(args, tokenizer, mode),
+            # CapDataset(args, tokenizer, mode),
             VQADataset(args, tokenizer, close_ended=True, mode=mode),
-            VQADataset(args, tokenizer, close_ended=False, mode=mode),
-            VQAYNDataset(args, tokenizer, mode),
+            # VQADataset(args, tokenizer, close_ended=False, mode=mode),
+            # VQAYNDataset(args, tokenizer, mode),
         ]
         self.dataset = ConcatDataset(self.ds_list)
 

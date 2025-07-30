@@ -211,3 +211,5 @@ output/
 data/data
 data/vqa_rad/
 wandb
+models
+*.whl

@@ -64,7 +64,7 @@ class ModelArguments:
     hidden_size: int = field(default=768)
     mlp_depth: int = field(default=2)
 
-    vision_encoder: Optional[str] = field(default="vit2d")
+    vision_encoder: Optional[str] = field(default="vit2d_diff")
     loss_type: str = field(default="sigmoid", metadata={"help": "Loss type for training."})
     siglip_margin: float = field(default=0.1)
 
@@ -102,10 +102,10 @@ class TrainingArguments(transformers.TrainingArguments):
 
     # config in bash file
     bf16: bool = True
-    output_dir: str = "./output/CLIP"
-    num_train_epochs: int = 100
+    output_dir: str = "./output/CLIP_Diff"
+    num_train_epochs: int = 50
     per_device_train_batch_size: int = 32
-    per_device_eval_batch_size: int = 4
+    per_device_eval_batch_size: int = 16
     gradient_accumulation_steps: int = 1
     eval_strategy: str = "steps"
     eval_accumulation_steps: int = 1
@@ -120,7 +120,7 @@ class TrainingArguments(transformers.TrainingArguments):
     logging_steps: float = 0.001
     gradient_checkpointing: bool = False
     dataloader_pin_memory: bool = True
-    dataloader_num_workers: int = 4
+    dataloader_num_workers: int = 6
     # THAY ĐỔI: Đặt report_to thành "none" nếu bạn không muốn dùng wandb khi chạy đơn lẻ
     report_to: str = "wandb" # Giữ nguyên nếu bạn vẫn muốn dùng wandb khi chạy đơn lẻ
 
@@ -217,7 +217,7 @@ def main():
     else:
         gather_all = False
     data_collator = DataCollator(gather_all)
-
+    model.to("cuda")
     trainer = CLIPTrainer(
         model=model,
         args=training_args,

@@ -2,7 +2,7 @@ import torch.nn as nn
 
 # from .dcformer import decomp_naive, decomp_nano, decomp_small, decomp_tiny
 from .vit import Vit2D
-
+from .vit_diff import Vit2Ddiff
 
 def build_vision_tower(config, **kwargs):
     return VisionTower(config)
@@ -23,6 +23,12 @@ class VisionTower(nn.Module):
                 dim=config.dim,
                 depth=config.depth,
             )
+        elif config.vision_tower == "vit2d_diff":
+            self.vision_tower = Vit2Ddiff(
+                input_size=config.input_size,
+                dim=config.dim,
+                depth=config.depth,
+            )
         elif config.vision_tower == "dcformer":
             self.vision_tower = decomp_small(
                 input_size=config.input_size,
@@ -34,13 +40,14 @@ class VisionTower(nn.Module):
 
     def forward(self, images):
         hidden_states = self.vision_tower(images)
+        # print(f"Hidden states shape: {hidden_states.shape}")
         if self.select_layer == 0:
             image_features = hidden_states
         elif self.select_layer < 0:
             image_features = hidden_states[self.select_layer :]
         else:
             raise ValueError(f"Unexpected select layer: {self.select_layer}")
-
+        # print(f"Image features shape after selecting layer: {image_features.shape}")
         if self.select_feature == "patch":
             image_features = image_features[:, 1:]
         elif self.select_feature == "cls_patch":

@@ -14,6 +14,7 @@ import numpy as np
 import torch
 import transformers
 from transformers import AutoTokenizer, LlamaForCausalLM
+from torch.utils.data import Dataset, ConcatDataset
 
 import wandb
 from src.dataset.mllm_dataset import CapDataset, TextDatasets, TextYNDatasets
@@ -40,7 +41,7 @@ class ModelArguments:
     pretrain_mllm: Optional[str] = field(default=None)
 
     tune_mm_mlp_adapter: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Used in pretrain: tune mm_projector and embed_tokens"},
     )
     pretrain_mm_mlp_adapter: Optional[str] = field(
@@ -56,7 +57,7 @@ class ModelArguments:
 
     # vision
     vision_tower: Optional[str] = field(default="vit2d")
-    vision_select_layer: Optional[int] = field(default=-2)
+    vision_select_layer: Optional[int] = field(default=0)
     vision_select_feature: Optional[str] = field(default="cls_patch")
     pretrain_vision_model: str = field(
         default="output/CLIP/pretrained_ViT.bin", metadata={"help": "Path to pretrained model for ViT."}
@@ -139,15 +140,15 @@ class TrainingArguments(transformers.TrainingArguments):
     # This is set up to facilitate debugging, pls config these in bash file in training.
     bf16: bool = True
     output_dir: str = "./output/Med2DVLM-pretrain"
-    num_train_epochs: float = 5
-    per_device_train_batch_size: int = 1
+    num_train_epochs: float = 3
+    per_device_train_batch_size: int = 2
     per_device_eval_batch_size: int = 1
     gradient_accumulation_steps: int = 1
     eval_strategy: str = "steps"
     eval_accumulation_steps: int = 1
     eval_steps: float = 0.04
     save_strategy: str = "steps"
-    save_steps: int = 2000
+    save_steps: int = 10000
     save_total_limit: int = 2
     learning_rate: float = 1e-4
     weight_decay: float = 0.0
@@ -185,6 +186,23 @@ def preprocess_logits_for_metrics(logits, labels):
 # vì chúng liên quan đến DeepSpeed Zero (một thư viện distributed training)
 
 
+def maybe_zero_3(param, ignore_status=False, name=None):
+    # Không sử dụng deepspeed nữa, chỉ trả về param đã detach và clone về cpu
+    return param.detach().cpu().clone()
+
+
+def get_mm_projector_state_maybe_zero_3(named_params, keys_to_match):
+    to_return = {
+        k: t
+        for k, t in named_params
+        if any(key_match in k for key_match in keys_to_match)
+    }
+    to_return = {
+        k: maybe_zero_3(v, ignore_status=True).cpu() for k, v in to_return.items()
+    }
+    return to_return
+
+
 def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: str):
     """Collects the state dict and dump to disk."""
 
@@ -192,43 +210,37 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
         # Only save projector and embed_tokens in pretrain
         keys_to_match = ["mm_projector", "embed_tokens", "embeddings"]
 
-        # Điều chỉnh để không sử dụng maybe_zero_3
-        # Lấy các tham số của model mà không cần DeepSpeed Zero
-        to_return = {
-            k: v.data.detach().cpu().clone()
-            for k, v in trainer.model.named_parameters()
-            if any(key_match in k for key_match in keys_to_match)
-        }
-
+        weight_to_save = get_mm_projector_state_maybe_zero_3(
+            trainer.model.named_parameters(), keys_to_match
+        )
         trainer.model.config.save_pretrained(output_dir)
 
         current_folder = output_dir.split("/")[-1]
         parent_folder = os.path.dirname(output_dir)
-        # Loại bỏ điều kiện trainer.args.local_rank
-        if current_folder.startswith("checkpoint-"):
-            mm_projector_folder = os.path.join(parent_folder, "mm_projector")
-            os.makedirs(mm_projector_folder, exist_ok=True)
-            torch.save(
-                to_return,
-                os.path.join(mm_projector_folder, f"{current_folder}.bin"),
-            )
-        else:
-            torch.save(
-                to_return, os.path.join(output_dir, f"mm_projector.bin")
-            )
+        if trainer.args.local_rank == 0 or trainer.args.local_rank == -1:
+            if current_folder.startswith("checkpoint-"):
+                mm_projector_folder = os.path.join(parent_folder, "mm_projector")
+                os.makedirs(mm_projector_folder, exist_ok=True)
+                torch.save(
+                    weight_to_save,
+                    os.path.join(mm_projector_folder, f"{current_folder}.bin"),
+                )
+            else:
+                torch.save(
+                    weight_to_save, os.path.join(output_dir, f"mm_projector.bin")
+                )
         return
 
-    # Loại bỏ kiểm tra trainer.deepspeed
-    # torch.cuda.synchronize() # Chỉ cần nếu bạn muốn đồng bộ GPU, không bắt buộc nếu không dùng distributed
-    trainer.save_model(output_dir)
-    return
+    if trainer.deepspeed:
+        torch.cuda.synchronize()
+        trainer.save_model(output_dir)
+        return
 
-    # Phần này sẽ không được gọi nếu đã return ở trên
-    # state_dict = trainer.model.state_dict()
-    # if trainer.args.should_save:
-    #     cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
-    #     del state_dict
-    #     trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
+    state_dict = trainer.model.state_dict()
+    if trainer.args.should_save:
+        cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
+        del state_dict
+        trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
 
 
 def find_all_linear_names(model):
@@ -273,13 +285,14 @@ class DataCollator:
 
 
 def main():
+    # for k in ["RANK", "WORLD_SIZE", "LOCAL_RANK", "MASTER_ADDR", "MASTER_PORT"]:
+    #     os.environ.pop(k, None)
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     rank0_print("=" * 20 + " Tokenizer preparation " + "=" * 20)
-    # Load tokenizer from the given path with specified configurations
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -288,7 +301,6 @@ def main():
         use_fast=False,
     )
 
-    # Define and add special tokens
     special_token = {"additional_special_tokens": ["<im_patch>"]}
     tokenizer.add_special_tokens(special_token)
 
@@ -298,7 +310,6 @@ def main():
         tokenizer.eos_token_id = 128001
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Convert special tokens to token IDs and set related arguments
     model_args.img_token_id = tokenizer.convert_tokens_to_ids("<im_patch>")
     model_args.vocab_size = len(tokenizer)
     rank0_print("vocab_size: ", model_args.vocab_size)
@@ -353,7 +364,7 @@ def main():
     model.initialize_vision_tokenizer(model_args, tokenizer)
 
     if model_args.pretrain_mllm:
-        ckpt = torch.load(model_args.pretrain_mllm, map_location="cpu")
+        ckpt = torch.load(model_args.pretrain_mllm, map_location="cuda")
         model.load_state_dict(ckpt, strict=True)
         rank0_print("load pretrained MLLM weights.")
 
@@ -389,32 +400,19 @@ def main():
 
     rank0_print("=" * 20 + " Dataset preparation " + "=" * 20)
     data_args.max_length = training_args.model_max_length
-    # Đảm bảo mm_projector đã được khởi tạo trước khi truy cập
-    # Kiểm tra model_args.vision_tower và model.get_model().mm_projector
-    if model_args.vision_tower is not None and hasattr(model.get_model(), 'mm_projector') and model.get_model().mm_projector is not None:
-        data_args.proj_out_num = model.get_model().mm_projector.proj_out_num
-        rank0_print("vision tokens output from projector: ", data_args.proj_out_num)
-    else:
-        rank0_print("Vision tower or MM projector not initialized, skipping proj_out_num logging.")
-        # Bạn có thể gán một giá trị mặc định nếu cần, hoặc xử lý logic khác
-        # data_args.proj_out_num = some_default_value
-
+    data_args.proj_out_num = model.get_model().mm_projector.proj_out_num
+    rank0_print("vision tokens output from projector: ", data_args.proj_out_num)
 
     if model_args.tune_mm_mlp_adapter:
         train_dataset = TextDatasets(data_args, tokenizer, mode="train")
-        # print("Using TextDatasets for training.")
-        # print("train_dataset length: ", len(train_dataset))
-        # print("train_dataset example: ", train_dataset[0])
     else:
         train_dataset = TextYNDatasets(data_args, tokenizer, mode="train")
 
     eval_dataset = CapDataset(data_args, tokenizer, mode="validation")
-    # print("Using CapDataset for evaluation.")
-    # print("eval_dataset length: ", len(eval_dataset))
-    # print("eval_dataset example: ", eval_dataset[0])
     data_collator = DataCollator()
 
     rank0_print("=" * 20 + " Training " + "=" * 20)
+    model.to("cuda")
     trainer = MLLMTrainer(
         model=model,
         args=training_args,
@@ -425,7 +423,6 @@ def main():
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     )
 
-    # Loại bỏ kiểm tra is_rank_zero() cho wandb.login() và wandb.init()
     wandb.login()
     wandb.init(project="MLLM", name=model_args.wb_name)
 
@@ -460,17 +457,12 @@ def main():
             os.path.join(training_args.output_dir, "model_with_lora.bin"),
         )
     else:
-        # Gọi hàm save_model của trainer, không cần điều kiện trainer.deepspeed
-        trainer.save_model(training_args.output_dir)
-        # Loại bỏ đoạn code cũ của safe_save_model_for_hf_trainer nếu không dùng deepspeed
-        # Dòng code dưới đây là dư thừa nếu trainer.save_model() đã bao phủ việc lưu lại mm_projector.bin
-        # safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)
+        safe_save_model_for_hf_trainer(
+            trainer=trainer, output_dir=training_args.output_dir
+        )
 
-    # Loại bỏ kiểm tra is_rank_zero() cho wandb.finish()
     wandb.finish()
 
-    # Loại bỏ dist.is_available() và dist.is_initialized()
-    # dist.destroy_process_group() # Loại bỏ dòng này
 
 if __name__ == "__main__":
     main()

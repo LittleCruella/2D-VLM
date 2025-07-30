@@ -12,6 +12,7 @@ from transformers import AutoConfig, AutoModel, PretrainedConfig, PreTrainedMode
 #     decomp_tiny,
 # )
 from src.model.encoder.vit import Vit2D
+from src.model.encoder.vit_diff import Vit2Ddiff
 # from src.model.projector.mlp import MultiLayerPerceptron
 
 # try:
@@ -68,6 +69,12 @@ class DEC_CLIP(PreTrainedModel):
 
         if config.vision_encoder == "vit2d":
             self.vision_encoder = Vit2D(
+                input_size=config.input_size,
+                dim=config.dim,
+                depth=config.depth,
+            )
+        elif config.vision_encoder == "vit2d_diff":
+            self.vision_encoder = Vit2Ddiff(
                 input_size=config.input_size,
                 dim=config.dim,
                 depth=config.depth,

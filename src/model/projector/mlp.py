@@ -90,9 +90,9 @@ class MixerLayer(nn.Module):
 class MixerLowHighHybridMLP(nn.Module):
     def __init__(
         self,
-        low_input_size: tuple = (256, 512), # (256, 384)
+        low_input_size: tuple = (256, 512),
         low_output_size: list = [192, 128],
-        high_input_size: tuple = (16, 768), # (32, 768)
+        high_input_size: tuple = (256, 512),
         high_output_size: list = [64, 128],
         output_dim=3584,
         depth=2,
@@ -144,7 +144,7 @@ class MixerLowHighHybridMLP(nn.Module):
         )
 
     def forward(self, x):
-        low_x, high_x = x
+        low_x, high_x = x, x
         for low_layer, high_layer in zip(self.low_mixer, self.high_mixer):
             low_x = low_layer(low_x)
             high_x = high_layer(high_x)

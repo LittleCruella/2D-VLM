@@ -34,7 +34,7 @@ def seed_everything(seed):
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", type=str, default="output/CLIP_test"
+        "--model_name_or_path", type=str, default="output/CLIP"
     )
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"])
@@ -51,11 +51,11 @@ def parse_args(args=None):
         "--test_method",
         type=tuple,
         default=(
-            "accuracy",
+            "recall",
         ),  # ("recall", "precision", "f1_score", "accuracy")
     )
     parser.add_argument("--test_topk", type=tuple, default=(1, 5, 10))
-    parser.add_argument("--test_size", type=tuple, default=(100, 500)) # (100, 500, 1000, 2000)
+    parser.add_argument("--test_size", type=tuple, default=(100, 500, 1000, 2000)) # (100, 500, 1000, 2000)
     parser.add_argument("--input_image", type=tuple, default=(256, 256))
     return parser.parse_args(args)
 

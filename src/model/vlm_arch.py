@@ -49,12 +49,12 @@ class VLMMetaModel:
             elif self.config.mm_projector_type == "mixer":
                 self.config.low_output_size = model_args.low_output_size
                 self.config.high_output_size = model_args.high_output_size
-                self.config.low_input_size = (256, 384)
-                self.config.high_input_size = (32, 768)
+                self.config.low_input_size = (256, 512)
+                self.config.high_input_size = (256, 512)
 
         if model_args.pretrain_vision_model is not None:
             vision_model_weights = torch.load(
-                model_args.pretrain_vision_model, map_location="cpu"
+                model_args.pretrain_vision_model, map_location="cuda"
             )
             self.vision_tower.vision_tower.load_state_dict(
                 vision_model_weights, strict=True
@@ -72,7 +72,7 @@ class VLMMetaModel:
 
         if model_args.pretrain_mm_mlp_adapter is not None:
             mm_projector_weights = torch.load(
-                model_args.pretrain_mm_mlp_adapter, map_location="cpu"
+                model_args.pretrain_mm_mlp_adapter, map_location="cuda"
             )
 
             if self.config.mm_projector_type == "mlp":
@@ -137,6 +137,7 @@ class VLMMetaForCausalLM(ABC):
 
     def encode_images(self, images):
         image_features = self.get_model().get_vision_tower()(images)
+        # print(f"Image features shape: {image_features.shape}")
         image_features = self.get_model().mm_projector(image_features)
         return image_features
 
@@ -163,8 +164,8 @@ class VLMMetaForCausalLM(ABC):
             image_features = self.encode_images(images)
             # image_features = rearrange(image_features, "b p1 p2 d -> b (p1 p2) d")
             inputs_embeds = self.get_model().embed_tokens(input_ids)
-            # print(f"Image features shape: {image_features.shape}")
-            # print(f"Input embeddings shape: {inputs_embeds.shape}")
+            print(f"Image features shape: {image_features.shape}")
+            print(f"Input embeddings shape: {inputs_embeds.shape}")
             inputs_embeds = torch.cat(
                 (
                     inputs_embeds[:, :1, :],
