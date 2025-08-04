@@ -213,3 +213,4 @@ data/vqa_rad/
 wandb
 models
 *.whl
+original_model

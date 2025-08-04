@@ -216,7 +216,7 @@ class ViTEncoder(nn.Module):
         emb_dropout=0.0,
     ):
         super().__init__()
-        h, w = image_size
+        h, w = image_size[0], image_size[1] 
         assert (h % patch_size == 0) and (w % patch_size == 0), "Image dimensions must be divisible by the patch size."
 
         self.vit_img_dim = [i // patch_size for i in image_size]

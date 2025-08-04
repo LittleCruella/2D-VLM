@@ -452,7 +452,7 @@ class TextDatasets(Dataset):
     def __init__(self, args, tokenizer, mode="train"):
         super(TextDatasets, self).__init__()
         self.ds_list = [
-            CapDataset(args, tokenizer, mode),
+            # CapDataset(args, tokenizer, mode),
             VQADataset(args, tokenizer, close_ended=True, mode=mode),
             # VQADataset(args, tokenizer, close_ended=False, mode=mode),
         ]

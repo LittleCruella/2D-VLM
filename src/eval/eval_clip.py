@@ -34,7 +34,7 @@ def seed_everything(seed):
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", type=str, default="output/CLIP"
+        "--model_name_or_path", type=str, default="output/CLIP_Diff"
     )
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"])

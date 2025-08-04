@@ -32,7 +32,7 @@ def rank0_print(*args):
 class ModelArguments:
     wb_name: Optional[str] = field(default="MLLM")
     model_name_or_path: Optional[str] = field(
-        default="Qwen/Qwen2.5-1.5B-Instruct",
+        default="Qwen/Qwen2.5-7B-Instruct",
         metadata={"help": "Path to the LLM or MLLM."},
     )
     model_type: Optional[str] = field(default="vlm_qwen")
@@ -60,7 +60,7 @@ class ModelArguments:
     vision_select_layer: Optional[int] = field(default=0)
     vision_select_feature: Optional[str] = field(default="cls_patch")
     pretrain_vision_model: str = field(
-        default="output/CLIP/pretrained_ViT.bin", metadata={"help": "Path to pretrained model for ViT."}
+        default="output/CLIP_Diff/pretrained_ViT.bin", metadata={"help": "Path to pretrained model for ViT."}
     )
     pretrain_clip_model: str = field(
         default=None, metadata={"help": "Path to pretrained model for CLIP."}
@@ -412,7 +412,7 @@ def main():
     data_collator = DataCollator()
 
     rank0_print("=" * 20 + " Training " + "=" * 20)
-    model.to("cuda")
+    # model.to("cuda")
     trainer = MLLMTrainer(
         model=model,
         args=training_args,

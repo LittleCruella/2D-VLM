@@ -41,7 +41,7 @@ def seed_everything(seed):
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", type=str, default="models/Med3DVLM-Qwen-2.5-1.5B"
+        "--model_name_or_path", type=str, default="output/Med3DVLM-Qwen-2.5-1.5B-finetune-diff"
     )
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--max_new_tokens", type=int, default=256)
@@ -53,9 +53,9 @@ def parse_args(args=None):
     # data
     parser.add_argument("--data_root", type=str, default="./data")
     parser.add_argument(
-        "--vqa_data_test_path", type=str, default="data/vqa_rad/test_yes_no.csv"
+        "--vqa_data_test_path", type=str, default="data/vqa_rad/test_other.csv"
     )
-    parser.add_argument("--close_ended", action="store_true", default=True)
+    parser.add_argument("--close_ended", action="store_true", default=False)
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -230,7 +230,10 @@ def main():
                     predictions=decoded_preds, references=decoded_labels, lang="en"
                 )
                 result["bert_f1"] = sum(bert_score["f1"]) / len(bert_score["f1"])
-
+                print(f"Result: {result}")
+                print(f"Question: {question[0]}")
+                print(f"Answer: {answer[0]}")
+                print(f"Generated text: {generated_texts[0]}")
                 writer.writerow(
                     [
                         question[0],
