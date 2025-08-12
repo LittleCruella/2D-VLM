@@ -58,7 +58,7 @@ class ModelArguments:
 
     pretrained_model: str = field(default=None)
 
-    input_size: tuple = field(default=(256, 256))
+    input_size: tuple = field(default=(448, 448))
     dim: int = field(default=512)
     depth: int = field(default=12)
     hidden_size: int = field(default=768)
@@ -80,7 +80,7 @@ class DataArguments:
         metadata={"help": "Path to caption data."},
     )
     max_length: int = field(default=512)
-    input_image: tuple = field(default=(256, 256))
+    input_image: tuple = field(default=(448, 448))
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
@@ -102,16 +102,16 @@ class TrainingArguments(transformers.TrainingArguments):
 
     # config in bash file
     bf16: bool = True
-    output_dir: str = "./output/CLIP_Diff"
+    output_dir: str = "./output/CLIP_Diff-2"
     num_train_epochs: int = 50
-    per_device_train_batch_size: int = 32
-    per_device_eval_batch_size: int = 16
+    per_device_train_batch_size: int = 6
+    per_device_eval_batch_size: int = 3
     gradient_accumulation_steps: int = 1
     eval_strategy: str = "steps"
     eval_accumulation_steps: int = 1
     eval_steps: float = 0.04
     save_strategy: str = "steps"
-    save_steps: int = 25000
+    save_steps: int = 80000
     save_total_limit: int = 1
     learning_rate: float = 1e-4
     weight_decay: float = 0.1

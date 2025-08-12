@@ -41,7 +41,7 @@ def seed_everything(seed):
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", type=str, default="output/Med3DVLM-Qwen-2.5-1.5B-finetune-diff"
+        "--model_name_or_path", type=str, default="models/Med3DVLM-Qwen-2.5-1.5B-diff-2"
     )
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--max_new_tokens", type=int, default=256)
